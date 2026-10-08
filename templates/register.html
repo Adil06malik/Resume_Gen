@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Register - AI Resume Tailor{% endblock %}
+{% block nav %}{% endblock %}
+{% block content %}
+<div style="max-width:400px; margin:80px auto;">
+    <div class="card">
+        <h2 style="margin-bottom:16px;">Register</h2>
+        <div id="error" class="error" style="display:none;"></div>
+        <form id="registerForm">
+            <label>Full Name</label>
+            <input type="text" id="full_name">
+            <label>Email</label>
+            <input type="email" id="email" required>
+            <label>Password</label>
+            <input type="password" id="password" required>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Register</button>
+        </form>
+        <p style="margin-top:12px; font-size:13px; text-align:center;">
+            Already have an account? <a href="/login">Login</a>
+        </p>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('error');
+    errEl.style.display = 'none';
+    const resp = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+            full_name: document.getElementById('full_name').value,
+        })
+    });
+    if (resp.ok) {
+        window.location.href = '/login';
+    } else {
+        const data = await resp.json();
+        errEl.textContent = data.detail || 'Registration failed';
+        errEl.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

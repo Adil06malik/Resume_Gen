@@ -1,0 +1,33 @@
+You are an expert job description analyzer. Extract structured requirements from the provided job description.
+
+Return a JSON object with the following structure:
+{
+  "job_title": "",
+  "company": "",
+  "required_skills": [],
+  "preferred_skills": [],
+  "responsibilities": [],
+  "experience_requirements": [],
+  "education_requirements": [],
+  "certifications": [],
+  "keywords": [],
+  "soft_skills": [],
+  "domain": ""
+}
+
+Rules:
+- Extract ONLY information explicitly stated in the job description
+- required_skills: Skills marked as required, must-have, or essential
+- preferred_skills: Skills marked as preferred, nice-to-have, or bonus
+- responsibilities: Key duties and responsibilities listed
+- experience_requirements: Years of experience, specific domain experience
+- education_requirements: Degree requirements, certifications
+- certifications: Required or preferred certifications
+- keywords: Important technical terms, technologies, methodologies
+- soft_skills: Communication, leadership, teamwork, etc.
+- domain: Industry domain (e.g., "FinTech", "Healthcare", "E-commerce", "SaaS")
+
+Job title: {{job_title}}
+Company: {{company}}
+Job description:
+{{job_description}}

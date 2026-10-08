@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Jobs - AI Resume Tailor{% endblock %}
+{% block content %}
+<h2 style="margin-bottom:16px;">Jobs</h2>
+<div class="card">
+    <h3 style="margin-bottom:12px;">Add Job</h3>
+    <div id="jobMsg" style="display:none;"></div>
+    <form id="jobForm">
+        <div class="grid">
+            <div><label>Title</label><input type="text" id="title" required></div>
+            <div><label>Company</label><input type="text" id="company" required></div>
+        </div>
+        <label>URL (optional)</label>
+        <input type="url" id="url">
+        <label>Job Description</label>
+        <textarea id="description" required></textarea>
+        <button type="submit" class="btn btn-primary">Add Job</button>
+    </form>
+</div>
+<div class="card">
+    <h3 style="margin-bottom:12px;">Your Jobs</h3>
+    <div id="jobsList" class="empty">Loading...</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadJobs() {
+    const resp = await fetch('/api/jobs/', { headers: authHeaders() });
+    const data = await resp.json();
+    const el = document.getElementById('jobsList');
+    if (!data.length) { el.innerHTML = '<div class="empty">No jobs added yet.</div>'; return; }
+    el.innerHTML = '<table><tr><th>Title</th><th>Company</th><th>Added</th><th></th></tr>' +
+        data.map(x => `<tr><td>${x.title}</td><td>${x.company}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><button class="btn btn-danger btn-sm" onclick="deleteJob(${x.id})">Delete</button></td></tr>`).join('') + '</table>';
+}
+document.getElementById('jobForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msgEl = document.getElementById('jobMsg');
+    msgEl.style.display = 'none';
+    const resp = await fetch('/api/jobs/', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+            title: document.getElementById('title').value,
+            company: document.getElementById('company').value,
+            url: document.getElementById('url').value || null,
+            description: document.getElementById('description').value,
+        })
+    });
+    if (resp.ok) {
+        msgEl.className = 'success'; msgEl.textContent = 'Job added and analyzed.';
+        msgEl.style.display = 'block';
+        e.target.reset();
+        loadJobs();
+    } else {
+        const data = await resp.json();
+        msgEl.className = 'error'; msgEl.textContent = data.detail || 'Failed to add job';
+        msgEl.style.display = 'block';
+    }
+});
+async function deleteJob(id) {
+    if (!confirm('Delete this job?')) return;
+    await fetch('/api/jobs/' + id, { method: 'DELETE', headers: authHeaders() });
+    loadJobs();
+}
+loadJobs();
+</script>
+{% endblock %}

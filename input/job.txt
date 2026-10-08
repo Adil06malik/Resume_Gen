@@ -1,0 +1,10 @@
+Paste the full job description here. The script reads this file (input/job.txt)
+and tails the master resume + writes a cover letter for this job.
+
+Example:
+Title: Senior Python Developer
+Company: Acme Corp
+
+Requirements:
+- 5+ years Python...
+- ...

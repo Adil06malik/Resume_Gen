@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Resumes - AI Resume Tailor{% endblock %}
+{% block content %}
+<h2 style="margin-bottom:16px;">Resumes</h2>
+<div class="card">
+    <h3 style="margin-bottom:12px;">Upload Resume</h3>
+    <div id="uploadMsg" style="display:none;"></div>
+    <form id="uploadForm" style="display:flex; gap:8px; align-items:end;">
+        <div style="flex:1;">
+            <label>PDF, DOCX, or TXT</label>
+            <input type="file" id="fileInput" accept=".pdf,.docx,.txt" required style="margin-bottom:0;">
+        </div>
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+</div>
+<div class="card">
+    <h3 style="margin-bottom:12px;">Your Resumes</h3>
+    <div id="resumesList" class="empty">Loading...</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function loadResumes() {
+    const resp = await fetch('/api/resumes/', { headers: authHeaders() });
+    const data = await resp.json();
+    const el = document.getElementById('resumesList');
+    if (!data.length) { el.innerHTML = '<div class="empty">No resumes uploaded yet.</div>'; return; }
+    el.innerHTML = '<table><tr><th>Filename</th><th>Uploaded</th><th></th></tr>' +
+        data.map(x => `<tr><td>${x.filename}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><button class="btn btn-danger btn-sm" onclick="deleteResume(${x.id})">Delete</button></td></tr>`).join('') + '</table>';
+}
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msgEl = document.getElementById('uploadMsg');
+    msgEl.style.display = 'none';
+    const formData = new FormData();
+    formData.append('file', document.getElementById('fileInput').files[0]);
+    const resp = await fetch('/api/resumes/upload', { method: 'POST', body: formData, headers: authHeadersForm() });
+    if (resp.ok) {
+        msgEl.className = 'success'; msgEl.textContent = 'Resume uploaded and parsed successfully.';
+        msgEl.style.display = 'block';
+        document.getElementById('fileInput').value = '';
+        loadResumes();
+    } else {
+        const data = await resp.json();
+        msgEl.className = 'error'; msgEl.textContent = data.detail || 'Upload failed';
+        msgEl.style.display = 'block';
+    }
+});
+async function deleteResume(id) {
+    if (!confirm('Delete this resume?')) return;
+    await fetch('/api/resumes/' + id, { method: 'DELETE', headers: authHeaders() });
+    loadResumes();
+}
+loadResumes();
+</script>
+{% endblock %}

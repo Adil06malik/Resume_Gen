@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% block title %}Tailor Resume - AI Resume Tailor{% endblock %}
+{% block content %}
+<style>
+.diff-table { width:100%; border-collapse:collapse; margin-top:8px; }
+.diff-table th { text-align:left; font-size:12px; text-transform:uppercase; color:#888; padding:6px 10px; border-bottom:2px solid #ddd; }
+.diff-table td { vertical-align:top; padding:0; font-size:13px; }
+.diff-row td { border-bottom:1px solid #f0f0f0; padding:6px 10px; }
+.diff-unchanged { background:#fff; color:#333; }
+.diff-added { background:#e8f5e9; color:#1b5e20; }
+.diff-removed { background:#fce4ec; color:#b71c1c; text-decoration:line-through; }
+.diff-tag { font-size:10px; font-weight:700; padding:1px 6px; border-radius:8px; margin-right:6px; white-space:nowrap; }
+.tag-added { background:#4caf50; color:#fff; }
+.tag-removed { background:#e53935; color:#fff; }
+.tag-unchanged { background:#e0e0e0; color:#555; }
+.section-head { margin:18px 0 6px; font-size:14px; font-weight:700; color:#1a1a2e; border-bottom:1px solid #eee; padding-bottom:4px; }
+.ats-bars { margin-top:8px; }
+.ats-bar-row { display:flex; align-items:center; margin-bottom:8px; gap:10px; }
+.ats-bar-label { width:150px; font-size:12px; color:#555; font-weight:600; }
+.ats-bar-wrap { flex:1; background:#eee; border-radius:8px; height:16px; overflow:hidden; }
+.ats-bar-fill { height:100%; border-radius:8px; }
+.ats-bar-value { width:42px; font-size:12px; font-weight:700; text-align:right; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+.chip { font-size:12px; padding:3px 10px; border-radius:12px; font-weight:600; }
+.chip-ok { background:#e8f5e9; color:#2e7d32; }
+.chip-miss { background:#fce4ec; color:#c62828; }
+.req { padding:8px 10px; border-radius:6px; margin-bottom:6px; font-size:13px; }
+.req-ok { background:#e8f5e9; color:#1b5e20; }
+.req-partial { background:#fff3e0; color:#e65100; }
+.req-miss { background:#fce4ec; color:#c62828; }
+.req-evidence { font-size:12px; color:#777; margin-top:2px; }
+.tab-btn { background:#eee; border:none; padding:8px 16px; border-radius:6px 6px 0 0; cursor:pointer; font-size:14px; margin-right:4px; }
+.tab-btn.active { background:#1a1a2e; color:#fff; }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+</style>
+
+<h2 style="margin-bottom:16px;">Tailor Your Resume &amp; Cover Letter</h2>
+
+<div class="card">
+    <div id="error" class="error" style="display:none;"></div>
+    <form id="tailorForm">
+        <label>Master Resume (PDF, DOCX, or TXT)</label>
+        <input type="file" id="resumeFile" accept=".pdf,.docx,.txt" required>
+
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px;">
+            <div>
+                <label>Job Title <span style="font-weight:400; color:#999;">(optional)</span></label>
+                <input type="text" id="jobTitle" placeholder="e.g. Senior Python Developer">
+            </div>
+            <div>
+                <label>Company <span style="font-weight:400; color:#999;">(optional)</span></label>
+                <input type="text" id="company" placeholder="e.g. Acme Corp">
+            </div>
+        </div>
+
+        <label>Job Description</label>
+        <textarea id="jobDescription" rows="8" placeholder="Paste the full job posting here..." required></textarea>
+
+        <button type="submit" class="btn btn-primary" id="generateBtn">Generate Tailored Resume &amp; Cover Letter</button>
+    </form>
+</div>
+
+<div id="progressCard" class="card" style="display:none;">
+    <h3 style="margin-bottom:12px;">Working on your resume...</h3>
+    <div id="progressMsg" style="font-size:14px; margin-bottom:8px;">Getting started...</div>
+    <div style="background:#eee; border-radius:10px; height:18px; overflow:hidden;">
+        <div id="progressBar" style="height:100%; width:0%; background:#e94560; border-radius:10px; transition:width .4s ease;"></div>
+    </div>
+    <div id="progressPct" style="font-size:12px; color:#888; margin-top:6px; text-align:right;">0%</div>
+</div>
+
+<div id="results" style="display:none;">
+    <div class="card">
+        <h3 style="margin-bottom:12px;">ATS Compatibility</h3>
+        <div id="atsBox" style="display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+            <div id="atsScore" style="font-size:44px; font-weight:700;"></div>
+            <div>
+                <div id="atsStatus" style="font-size:14px; font-weight:600;"></div>
+                <div id="missingKeywords" style="font-size:13px; color:#777;">&nbsp;</div>
+            </div>
+        </div>
+        <div id="atsBars" class="ats-bars"></div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-bottom:8px;">How Your Resume Was Tailored</h3>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+            <button type="button" class="tab-btn active" data-tab="diff">Side-by-side diff</button>
+            <button type="button" class="tab-btn" data-tab="keywords">Keywords &amp; requirements</button>
+        </div>
+        <div id="tab-diff" class="tab-panel active"></div>
+        <div id="tab-keywords" class="tab-panel"></div>
+    </div>
+
+    <div class="card">
+        <h3 style="margin-bottom:16px;">Download Documents</h3>
+        <h4 style="margin-bottom:8px; color:#555; font-size:14px;">Tailored Resume</h4>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
+            <a class="btn btn-primary btn-sm" id="dlResumePdf">PDF</a>
+            <a class="btn btn-secondary btn-sm" id="dlResumeDocx">DOCX</a>
+            <a class="btn btn-secondary btn-sm" id="dlResumeTxt">TXT</a>
+        </div>
+        <h4 style="margin-bottom:8px; color:#555; font-size:14px;">Cover Letter</h4>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a class="btn btn-primary btn-sm" id="dlCoverPdf">PDF</a>
+            <a class="btn btn-secondary btn-sm" id="dlCoverTxt">TXT</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function scoreClass(s) { return s >= 70 ? 'score-high' : s >= 40 ? 'score-mid' : 'score-low'; }
+function esc(s) { return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function barColor(v) { return v >= 70 ? '#4caf50' : v >= 40 ? '#ff9800' : '#e53935'; }
+
+async function downloadFile(url, filename) {
+    try {
+        const resp = await fetch(url, { headers: { 'Authorization': 'Bearer ' + getToken() } });
+        if (!resp.ok) { const d = await resp.json().catch(() => ({})); throw new Error(d.detail || 'Download failed (' + resp.status + ')'); }
+        const blob = await resp.blob();
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    } catch (e) {
+        alert('Download failed: ' + e.message);
+    }
+}
+
+function setupDownload(id, url, filename) {
+    const el = document.getElementById(id);
+    el.addEventListener('click', (e) => { e.preventDefault(); downloadFile(url, filename); });
+}
+
+function renderATS(ats, score) {
+    document.getElementById('atsScore').textContent = score != null ? score.toFixed(0) + '%' : '-';
+    document.getElementById('atsScore').className = 'score ' + scoreClass(score);
+    document.getElementById('atsScore').style.padding = '6px 12px';
+    const st = document.getElementById('atsStatus');
+    if (score != null) st.textContent = score >= 70 ? 'Excellent match' : score >= 40 ? 'Good match' : 'Could be improved';
+    else st.textContent = 'ATS scoring unavailable';
+    document.getElementById('missingKeywords').textContent =
+        ats && ats.missing_keywords && ats.missing_keywords.length ? 'Missing keywords: ' + ats.missing_keywords.join(', ') : '';
+
+    const bars = [
+        ['Keyword match', ats && ats.keyword_score],
+        ['Skills match', ats && ats.skills_score],
+        ['Experience', ats && ats.experience_score],
+        ['Responsibilities', ats && ats.responsibility_score],
+        ['Formatting', ats && ats.formatting_score],
+    ];
+    const wrap = document.getElementById('atsBars');
+    wrap.innerHTML = bars.map(([label, v]) => {
+        if (v == null) return '';
+        return `<div class="ats-bar-row">
+            <div class="ats-bar-label">${label}</div>
+            <div class="ats-bar-wrap"><div class="ats-bar-fill" style="width:${v}%; background:${barColor(v)};"></div></div>
+            <div class="ats-bar-value">${v.toFixed(0)}</div>
+        </div>`;
+    }).join('');
+}
+
+function renderDiff(diff) {
+    let rows = '';
+    let hasAdded = false;
+    for (const section of diff) {
+        rows += `<div class="section-head">${esc(section.title)}</div>`;
+        rows += `<table class="diff-table"><tr><th style="width:30px;"></th><th>Change</th></tr>`;
+        for (const line of section.lines) {
+            if (line.status === 'added') hasAdded = true;
+            const cls = 'diff-' + line.status;
+            const tag = { added: 'ADDED', removed: 'REMOVED', unchanged: 'UNCHANGED' }[line.status] || line.status;
+            const tagCls = 'tag-' + line.status;
+            rows += `<tr class="diff-row"><td class="${cls}">`;
+            rows += `<span class="diff-tag ${tagCls}">${tag}</span>${line.status === 'unchanged' ? '' : ''}</td>`;
+            rows += `<td class="${cls}">${line.status === 'unchanged' ? esc(line.text) : esc(line.text)}</td></tr>`;
+        }
+        rows += '</table>';
+    }
+    document.getElementById('tab-diff').innerHTML = rows || '<p style="color:#999">No changes detected.</p>';
+}
+
+function renderKeywords(ats, match) {
+    let html = '<div class="section-head">Job keywords</div>';
+    const ok = (ats && ats.matched_keywords) || [];
+    const miss = (ats && ats.missing_keywords) || [];
+    html += '<div class="chips">' +
+        ok.map(k => `<span class="chip chip-ok">${esc(k)} ✓</span>`).join('') +
+        miss.map(k => `<span class="chip chip-miss">${esc(k)} ✗</span>`).join('') +
+        (ok.length + miss.length === 0 ? '<span style="color:#999;font-size:13px">No keyword data</span>' : '') +
+        '</div>';
+
+    html += '<div class="section-head">Requirements status</div>';
+    const reqs = [];
+    (match && match.matched_requirements || []).forEach(r => reqs.push({ ...r, s: 'ok' }));
+    (match && match.partial_requirements || []).forEach(r => reqs.push({ ...r, s: 'partial' }));
+    (match && match.missing_requirements || []).forEach(r => reqs.push({ ...r, s: 'miss' }));
+    if (reqs.length) {
+        html += '<div style="margin-top:10px">' + reqs.map(r => {
+            const label = r.s === 'ok' ? 'MATCH' : r.s === 'partial' ? 'PARTIAL' : 'MISSING';
+            const icon = r.s === 'ok' ? '✓' : r.s === 'partial' ? '~' : '✗';
+            return `<div class="req req-${r.s}">
+                <b>${icon} ${label}:</b> ${esc(r.requirement)}
+                ${r.evidence ? `<div class="req-evidence">Evidence: ${esc(r.evidence)}</div>` : ''}
+            </div>`;
+        }).join('') + '</div>';
+    } else {
+        html += '<p style="color:#999">No requirement data.</p>';
+    }
+    document.getElementById('tab-keywords').innerHTML = html;
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+});
+
+document.getElementById('tailorForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errEl = document.getElementById('error');
+    errEl.style.display = 'none';
+    const btn = document.getElementById('generateBtn');
+    const file = document.getElementById('resumeFile').files[0];
+    const desc = document.getElementById('jobDescription').value.trim();
+    if (!file) { errEl.textContent = 'Please select a resume file.'; errEl.style.display = 'block'; return; }
+    if (!desc) { errEl.textContent = 'Please paste the job description.'; errEl.style.display = 'block'; return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Working... this can take a minute';
+
+    const progressCard = document.getElementById('progressCard');
+    const progressBar = document.getElementById('progressBar');
+    const progressMsg = document.getElementById('progressMsg');
+    const progressPct = document.getElementById('progressPct');
+    progressCard.style.display = 'block';
+    progressBar.style.width = '5%';
+    progressPct.textContent = '5%';
+    progressMsg.textContent = 'Getting started...';
+    progressCard.scrollIntoView({ behavior: 'smooth' });
+
+    const pToken = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const pollStop = { stop: false };
+
+    const poll = async () => {
+        if (pollStop.stop) return;
+        try {
+            const r = await fetch('/api/tailor/progress/' + pToken, {
+                headers: { 'Authorization': 'Bearer ' + getToken() }
+            });
+            const d = await r.json();
+            const pct = Math.max(d.percent || 0, parseInt(progressBar.style.width) || 0);
+            progressBar.style.width = pct + '%';
+            progressPct.textContent = pct + '%';
+            if (d.message) progressMsg.textContent = d.message;
+            if (d.error) { progressMsg.textContent = 'Error: ' + d.error; }
+        } catch (e) { /* ignore transient poll errors */ }
+        if (!pollStop.stop) setTimeout(poll, 1500);
+    };
+    poll();
+
+    const fd = new FormData();
+    fd.append('resume_file', file);
+    fd.append('job_title', document.getElementById('jobTitle').value);
+    fd.append('company', document.getElementById('company').value);
+    fd.append('job_description', desc);
+    fd.append('progress_token', pToken);
+
+    try {
+        const resp = await fetch('/api/tailor', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + getToken() },
+            body: fd,
+        });
+        const data = await resp.json();
+        if (!resp.ok) { throw new Error(data.detail || 'Failed to generate'); }
+
+        // show 100% before hiding
+        progressBar.style.width = '100%';
+        progressPct.textContent = '100%';
+        progressMsg.textContent = 'Completed!';
+        setTimeout(() => { progressCard.style.display = 'none'; }, 600);
+
+        const base = data.download_base;
+        setupDownload('dlResumePdf', base + '/resume/pdf', 'tailored_resume.pdf');
+        setupDownload('dlResumeDocx', base + '/resume/docx', 'tailored_resume.docx');
+        setupDownload('dlResumeTxt', base + '/resume/txt', 'tailored_resume.txt');
+        setupDownload('dlCoverPdf', base + '/cover-letter/pdf', 'cover_letter.pdf');
+        setupDownload('dlCoverTxt', base + '/cover-letter/txt', 'cover_letter.txt');
+
+        const results = document.getElementById('results');
+        results.style.display = 'block';
+        results.scrollIntoView({ behavior: 'smooth' });
+
+        renderATS(data.ats, data.ats_score);
+        if (data.diff) renderDiff(data.diff);
+        renderKeywords(data.ats, data.match);
+    } catch (err) {
+        pollStop.stop = true;
+        progressCard.style.display = 'none';
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+    } finally {
+        pollStop.stop = true;
+        btn.disabled = false;
+        btn.textContent = 'Generate Tailored Resume & Cover Letter';
+    }
+});
+</script>
+{% endblock %}

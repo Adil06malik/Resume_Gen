@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}Application Detail - AI Resume Tailor{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+    <h2>Application #{{ app_id }}</h2>
+    <a href="/applications" class="btn btn-secondary btn-sm">Back</a>
+</div>
+
+<div id="statusBar" class="card" style="display:flex; gap:16px; align-items:center;">
+    <span>Status: <strong id="statusText">-</strong></span>
+    <span>ATS Score: <span id="atsBadge">-</span></span>
+    <div style="margin-left:auto; display:flex; gap:6px;">
+        <select id="statusSelect" style="width:auto; margin:0;">
+            <option value="Draft">Draft</option>
+            <option value="Applied">Applied</option>
+            <option value="Interview">Interview</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Offer">Offer</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="updateStatus()">Update</button>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="card">
+        <h3>Actions</h3>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px;">
+            <button class="btn btn-primary" onclick="runMatch()">Match Resume</button>
+            <button class="btn btn-primary" onclick="runTailor()">Tailor Resume</button>
+            <button class="btn btn-primary" onclick="runATS()">Analyze ATS</button>
+            <button class="btn btn-primary" onclick="runCoverLetter()">Generate Cover Letter</button>
+            <button class="btn btn-secondary" onclick="generateDocs()" style="margin-top:4px;">Generate PDF/DOCX</button>
+        </div>
+        <div id="actionMsg" style="margin-top:12px;"></div>
+        <div id="downloadLinks" style="margin-top:12px; display:none;">
+            <h4>Downloads</h4>
+            <div style="display:flex; flex-direction:column; gap:4px; margin-top:6px;">
+                <a id="dlResumePdf" href="#" class="btn btn-primary btn-sm" download style="display:none;">Resume PDF</a>
+                <a id="dlResumeDocx" href="#" class="btn btn-primary btn-sm" download style="display:none;">Resume DOCX</a>
+                <a id="dlCoverPdf" href="#" class="btn btn-primary btn-sm" download style="display:none;">Cover Letter PDF</a>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <h3>Match Results</h3>
+        <div id="matchResults" class="empty">Run match to see results</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3>Tailored Resume</h3>
+    <div id="tailoredResume" class="empty">Run tailor to generate</div>
+</div>
+
+<div class="card">
+    <h3>ATS Analysis</h3>
+    <div id="atsAnalysis" class="empty">Run ATS analysis to see scores</div>
+</div>
+
+<div class="card">
+    <h3>Cover Letter</h3>
+    <div id="coverLetter" class="empty">Generate a cover letter</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const APP_ID = {{ app_id }};
+function showMsg(el, type, text) { el.className = type; el.textContent = text; el.style.display = 'block'; }
+function setLoading(el, text) { el.innerHTML = '<div class="empty">Loading...</div>'; }
+
+async function loadApp() {
+    const resp = await fetch('/api/applications/' + APP_ID, { headers: authHeaders() });
+    if (!resp.ok) { window.location.href = '/applications'; return; }
+    const d = await resp.json();
+    document.getElementById('statusText').textContent = d.status;
+    document.getElementById('statusSelect').value = d.status;
+    if (d.ats_score != null) {
+        document.getElementById('atsBadge').innerHTML = '<span class="score ' + scoreClass(d.ats_score) + '">' + d.ats_score.toFixed(0) + '%</span>';
+    }
+    if (d.tailored_resume) renderTailored(d.tailored_resume);
+    if (d.cover_letter) document.getElementById('coverLetter').innerHTML = '<pre style="white-space:pre-wrap; font-size:13px;">' + d.cover_letter + '</pre>';
+}
+
+async function updateStatus() {
+    await fetch('/api/applications/' + APP_ID + '/status', {
+        method: 'PUT', headers: authHeaders(),
+        body: JSON.stringify({ status: document.getElementById('statusSelect').value })
+    });
+    loadApp();
+}
+
+async function runMatch() {
+    const el = document.getElementById('matchResults'); setLoading(el);
+    const msgEl = document.getElementById('actionMsg'); msgEl.style.display = 'none';
+    const resp = await fetch('/api/applications/' + APP_ID + '/match', { method: 'POST', headers: authHeaders() });
+    if (!resp.ok) { showMsg(msgEl, 'error', 'Match failed'); el.innerHTML = ''; return; }
+    const d = await resp.json();
+    let html = '';
+    if (d.matched_requirements.length) html += '<h4 style="color:#2e7d32">Matched</h4>' + d.matched_requirements.map(x => `<div style="margin:4px 0;"><strong>${x.requirement}</strong><br><small>${x.evidence}</small></div>`).join('');
+    if (d.partial_requirements.length) html += '<h4 style="color:#e65100; margin-top:8px;">Partial</h4>' + d.partial_requirements.map(x => `<div style="margin:4px 0;"><strong>${x.requirement}</strong><br><small>${x.evidence}</small></div>`).join('');
+    if (d.missing_requirements.length) html += '<h4 style="color:#c62828; margin-top:8px;">Missing</h4>' + d.missing_requirements.map(x => `<div style="margin:4px 0;"><strong>${x.requirement}</strong><br><small>${x.evidence}</small></div>`).join('');
+    el.innerHTML = html || '<div class="empty">No results</div>';
+}
+
+async function runTailor() {
+    const el = document.getElementById('tailoredResume'); setLoading(el);
+    const msgEl = document.getElementById('actionMsg'); msgEl.style.display = 'none';
+    showMsg(msgEl, 'success', 'Tailoring resume... this may take a moment.');
+    const resp = await fetch('/api/applications/' + APP_ID + '/tailor', { method: 'POST', headers: authHeaders() });
+    if (!resp.ok) { showMsg(msgEl, 'error', 'Tailor failed'); el.innerHTML = ''; return; }
+    showMsg(msgEl, 'success', 'Resume tailored successfully.');
+    const d = await resp.json();
+    if (d.tailored_resume) renderTailored(d.tailored_resume);
+    if (d.ats_score != null) {
+        document.getElementById('atsBadge').innerHTML = '<span class="score ' + scoreClass(d.ats_score) + '">' + d.ats_score.toFixed(0) + '%</span>';
+    }
+}
+
+function renderTailored(r) {
+    let html = '';
+    if (r.candidate && r.candidate.name) html += '<p><strong>' + r.candidate.name + '</strong></p>';
+    if (r.summary) html += '<p style="margin:8px 0;">' + r.summary + '</p>';
+    if (r.skills && r.skills.length) html += '<h4 style="margin-top:8px;">Skills</h4><p>' + r.skills.map(s => s.name).join(', ') + '</p>';
+    if (r.experience && r.experience.length) {
+        html += '<h4 style="margin-top:8px;">Experience</h4>';
+        r.experience.forEach(e => {
+            html += '<div style="margin:6px 0;"><strong>' + e.title + '</strong> at ' + e.company + ' (' + e.start_date + ' - ' + e.end_date + ')';
+            if (e.description && e.description.length) html += '<ul style="margin:4px 0 0 20px;">' + e.description.map(d => '<li>' + d + '</li>').join('') + '</ul>';
+            html += '</div>';
+        });
+    }
+    if (r.education && r.education.length) {
+        html += '<h4 style="margin-top:8px;">Education</h4>';
+        r.education.forEach(e => { html += '<p>' + e.degree + ', ' + e.institution + '</p>'; });
+    }
+    document.getElementById('tailoredResume').innerHTML = html || '<div class="empty">No content</div>';
+}
+
+async function runATS() {
+    const el = document.getElementById('atsAnalysis'); setLoading(el);
+    const msgEl = document.getElementById('actionMsg'); msgEl.style.display = 'none';
+    showMsg(msgEl, 'success', 'Running ATS analysis...');
+    const resp = await fetch('/api/applications/' + APP_ID + '/ats', { method: 'POST', headers: authHeaders() });
+    if (!resp.ok) { showMsg(msgEl, 'error', 'ATS analysis failed'); el.innerHTML = ''; return; }
+    showMsg(msgEl, 'success', 'ATS analysis complete.');
+    const d = await resp.json();
+    document.getElementById('atsBadge').innerHTML = '<span class="score ' + scoreClass(d.overall_score) + '">' + d.overall_score.toFixed(0) + '%</span>';
+    el.innerHTML = `
+        <div class="grid" style="margin-bottom:12px;">
+            <div><strong>Overall:</strong> <span class="score ${scoreClass(d.overall_score)}">${d.overall_score.toFixed(0)}%</span></div>
+            <div><strong>Keywords:</strong> <span class="score ${scoreClass(d.keyword_score)}">${d.keyword_score.toFixed(0)}%</span></div>
+            <div><strong>Skills:</strong> <span class="score ${scoreClass(d.skills_score)}">${d.skills_score.toFixed(0)}%</span></div>
+            <div><strong>Experience:</strong> <span class="score ${scoreClass(d.experience_score)}">${d.experience_score.toFixed(0)}%</span></div>
+            <div><strong>Responsibilities:</strong> <span class="score ${scoreClass(d.responsibility_score)}">${d.responsibility_score.toFixed(0)}%</span></div>
+            <div><strong>Formatting:</strong> <span class="score ${scoreClass(d.formatting_score)}">${d.formatting_score.toFixed(0)}%</span></div>
+        </div>
+        ${d.matched_keywords.length ? '<h4>Matched Keywords</h4><p>' + d.matched_keywords.join(', ') + '</p>' : ''}
+        ${d.missing_keywords.length ? '<h4 style="margin-top:6px;">Missing Keywords</h4><p>' + d.missing_keywords.join(', ') + '</p>' : ''}
+    `;
+}
+
+async function runCoverLetter() {
+    const el = document.getElementById('coverLetter'); setLoading(el);
+    const msgEl = document.getElementById('actionMsg'); msgEl.style.display = 'none';
+    showMsg(msgEl, 'success', 'Generating cover letter...');
+    const resp = await fetch('/api/applications/' + APP_ID + '/cover-letter', { method: 'POST', headers: authHeaders() });
+    if (!resp.ok) { showMsg(msgEl, 'error', 'Generation failed'); el.innerHTML = ''; return; }
+    showMsg(msgEl, 'success', 'Cover letter generated.');
+    const d = await resp.json();
+    el.innerHTML = '<pre style="white-space:pre-wrap; font-size:13px;">' + d.cover_letter + '</pre>';
+}
+
+async function generateDocs() {
+    const msgEl = document.getElementById('actionMsg'); msgEl.style.display = 'none';
+    showMsg(msgEl, 'success', 'Generating PDF and DOCX files...');
+    const resp = await fetch('/api/applications/' + APP_ID + '/generate-documents', { method: 'POST', headers: authHeaders() });
+    if (!resp.ok) {
+        const data = await resp.json();
+        showMsg(msgEl, 'error', data.detail || 'Generation failed');
+        return;
+    }
+    showMsg(msgEl, 'success', 'Documents generated successfully.');
+    const d = await resp.json();
+    const dl = document.getElementById('downloadLinks');
+    dl.style.display = 'block';
+    if (d.resume_pdf) {
+        const el = document.getElementById('dlResumePdf');
+        el.href = '/api/applications/' + APP_ID + '/resume/pdf';
+        el.style.display = 'inline-block';
+    }
+    if (d.resume_docx) {
+        const el = document.getElementById('dlResumeDocx');
+        el.href = '/api/applications/' + APP_ID + '/resume/docx';
+        el.style.display = 'inline-block';
+    }
+    if (d.cover_letter_pdf) {
+        const el = document.getElementById('dlCoverPdf');
+        el.href = '/api/applications/' + APP_ID + '/cover-letter/pdf';
+        el.style.display = 'inline-block';
+    }
+}
+
+loadApp();
+</script>
+{% endblock %}

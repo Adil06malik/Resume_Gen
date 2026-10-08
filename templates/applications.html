@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Applications - AI Resume Tailor{% endblock %}
+{% block content %}
+<h2 style="margin-bottom:16px;">Applications</h2>
+<div class="card">
+    <h3 style="margin-bottom:12px;">Create Application</h3>
+    <div id="appMsg" style="display:none;"></div>
+    <form id="appForm" style="display:flex; gap:8px; align-items:end;">
+        <div style="flex:1;">
+            <label>Resume</label>
+            <select id="resumeSelect" required></select>
+        </div>
+        <div style="flex:1;">
+            <label>Job</label>
+            <select id="jobSelect" required></select>
+        </div>
+        <button type="submit" class="btn btn-primary">Create</button>
+    </form>
+</div>
+<div class="card">
+    <h3 style="margin-bottom:12px;">Your Applications</h3>
+    <div id="appsList" class="empty">Loading...</div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let resumes = [], jobs = [];
+async function loadData() {
+    const [r, j, a] = await Promise.all([
+        fetch('/api/resumes/', { headers: authHeaders() }).then(r => r.json()),
+        fetch('/api/jobs/', { headers: authHeaders() }).then(r => r.json()),
+        fetch('/api/applications/', { headers: authHeaders() }).then(r => r.json()),
+    ]);
+    resumes = r; jobs = j;
+    const rs = document.getElementById('resumeSelect');
+    rs.innerHTML = r.length ? r.map(x => `<option value="${x.id}">${x.filename}</option>`).join('') : '<option>No resumes</option>';
+    const js = document.getElementById('jobSelect');
+    js.innerHTML = j.length ? j.map(x => `<option value="${x.id}">${x.title} - ${x.company}</option>`).join('') : '<option>No jobs</option>';
+    const el = document.getElementById('appsList');
+    if (!a.length) { el.innerHTML = '<div class="empty">No applications yet.</div>'; return; }
+    el.innerHTML = '<table><tr><th>ID</th><th>Status</th><th>ATS</th><th>Created</th><th></th></tr>' +
+        a.map(x => `<tr><td>#${x.id}</td><td>${x.status}</td><td>${x.ats_score != null ? '<span class="score ' + scoreClass(x.ats_score) + '">' + x.ats_score.toFixed(0) + '%</span>' : '-'}</td><td>${new Date(x.created_at).toLocaleDateString()}</td><td><a href="/applications/${x.id}" class="btn btn-secondary btn-sm">View</a> <button class="btn btn-danger btn-sm" onclick="deleteApp(${x.id})">Delete</button></td></tr>`).join('') + '</table>';
+}
+document.getElementById('appForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msgEl = document.getElementById('appMsg');
+    msgEl.style.display = 'none';
+    const resp = await fetch('/api/applications/', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ resume_id: +document.getElementById('resumeSelect').value, job_id: +document.getElementById('jobSelect').value })
+    });
+    if (resp.ok) {
+        msgEl.className = 'success'; msgEl.textContent = 'Application created.';
+        msgEl.style.display = 'block';
+        loadData();
+    } else {
+        const data = await resp.json();
+        msgEl.className = 'error'; msgEl.textContent = data.detail || 'Failed';
+        msgEl.style.display = 'block';
+    }
+});
+async function deleteApp(id) {
+    if (!confirm('Delete this application?')) return;
+    await fetch('/api/applications/' + id, { method: 'DELETE', headers: authHeaders() });
+    loadData();
+}
+loadData();
+</script>
+{% endblock %}

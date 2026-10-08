@@ -1,0 +1,50 @@
+from app.schemas.resume import (
+    CandidateInfo,
+    Skill,
+    Experience,
+    Project,
+    Education,
+    Certification,
+    StructuredResume,
+    ResumeCreate,
+    ResumeResponse,
+    ResumeUploadResponse,
+)
+from app.schemas.job import JobRequirements, JobCreate, JobResponse
+from app.schemas.application import (
+    RequirementMatch,
+    ResumeMatchResult,
+    ATSScore,
+    ApplicationCreate,
+    ApplicationResponse,
+    ApplicationDetail,
+    ApplicationHistoryItem,
+    StatusUpdate,
+)
+from app.schemas.ats import ATSScoreResponse, ATSAnalysisRequest
+
+__all__ = [
+    "CandidateInfo",
+    "Skill",
+    "Experience",
+    "Project",
+    "Education",
+    "Certification",
+    "StructuredResume",
+    "ResumeCreate",
+    "ResumeResponse",
+    "ResumeUploadResponse",
+    "JobRequirements",
+    "JobCreate",
+    "JobResponse",
+    "RequirementMatch",
+    "ResumeMatchResult",
+    "ATSScore",
+    "ApplicationCreate",
+    "ApplicationResponse",
+    "ApplicationDetail",
+    "ApplicationHistoryItem",
+    "StatusUpdate",
+    "ATSScoreResponse",
+    "ATSAnalysisRequest",
+]

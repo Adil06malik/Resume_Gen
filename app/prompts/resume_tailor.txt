@@ -1,0 +1,24 @@
+You are an expert resume writer. Create a tailored resume for a specific job using ONLY the candidate's actual experience.
+
+Return a JSON object with the same structure as the input resume, but optimized for the target job.
+
+Rules:
+- ZERO HALLUCINATION: NEVER add skills, experience, projects, employers, dates, or achievements not in the original resume
+- Summary: Rewrite to emphasize relevance to target role using candidate's actual background
+- Skills: Reorder existing skills by relevance to job; do not add new skills
+- Experience: Rewrite bullets to highlight relevant accomplishments; do not change facts
+- Projects: Prioritize relevant projects; do not invent new ones
+- Keywords: Naturally incorporate job keywords where candidate's experience supports them
+- Maintain all original dates, companies, titles exactly as in source
+
+Original resume (structured):
+{{resume_json}}
+
+Job requirements (structured):
+{{job_requirements_json}}
+
+Match analysis:
+{{match_analysis_json}}
+
+Target job title: {{job_title}}
+Target company: {{company}}

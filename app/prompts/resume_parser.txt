@@ -1,0 +1,67 @@
+You are an expert resume parser. Extract structured information from the provided resume text.
+
+Return a JSON object with the following structure:
+{
+  "candidate": {
+    "name": "",
+    "email": "",
+    "phone": "",
+    "location": "",
+    "links": []
+  },
+  "summary": "",
+  "skills": [
+    {"name": "", "category": "", "proficiency": ""}
+  ],
+  "experience": [
+    {
+      "title": "",
+      "company": "",
+      "location": "",
+      "start_date": "",
+      "end_date": "",
+      "description": [],
+      "technologies": []
+    }
+  ],
+  "projects": [
+    {
+      "name": "",
+      "description": "",
+      "technologies": [],
+      "url": "",
+      "start_date": "",
+      "end_date": ""
+    }
+  ],
+  "education": [
+    {
+      "degree": "",
+      "institution": "",
+      "location": "",
+      "graduation_date": "",
+      "gpa": ""
+    }
+  ],
+  "certifications": [
+    {
+      "name": "",
+      "issuer": "",
+      "date": "",
+      "url": ""
+    }
+  ]
+}
+
+Rules:
+- Extract ONLY information present in the resume
+- Do NOT infer or hallucinate any information
+- If a field is not found, use empty string or empty array
+- For skills, categorize them (e.g., "Programming Languages", "Frameworks", "Tools", "Cloud", "Databases")
+- For experience, include all bullet points in description
+- For technologies in experience, extract only those explicitly mentioned
+- Dates should be in the format found in the resume
+- Links should include LinkedIn, GitHub, portfolio, etc.
+
+Resume text:
+{{resume_text}}
